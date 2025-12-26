@@ -411,6 +411,21 @@ class WorkerService {
   }
 
   /**
+   * Shutdown the worker service and cleanup resources
+   */
+  shutdown(): void {
+    logger.info('SYSTEM', 'Shutting down worker service...');
+
+    // Abort all active sessions
+    for (const [sessionId, session] of this.sessions.entries()) {
+      logger.info('WORKER', 'Aborting session on shutdown', { sessionId });
+      session.abortController.abort();
+    }
+
+    logger.info('SYSTEM', 'Worker service shutdown complete');
+  }
+
+  /**
    * Run SDK agent for a session
    */
   private async runSDKAgent(session: ActiveSession): Promise<void> {
@@ -689,15 +704,14 @@ async function main() {
   await service.start();
 
   // Graceful shutdown
-  process.on('SIGINT', () => {
-    logger.warn('SYSTEM', 'Shutting down (SIGINT)');
+  const shutdown = () => {
+    logger.warn('SYSTEM', 'Shutting down...');
+    service.shutdown();
     process.exit(0);
-  });
+  };
 
-  process.on('SIGTERM', () => {
-    logger.warn('SYSTEM', 'Shutting down (SIGTERM)');
-    process.exit(0);
-  });
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 // Auto-start when run directly (not when imported)
