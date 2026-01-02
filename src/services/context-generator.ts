@@ -23,7 +23,7 @@ import { getProjectName } from '../utils/project-name.js';
 import { ModeManager } from './domain/ModeManager.js';
 
 // Version marker path - use homedir-based path that works in both CJS and ESM contexts
-const VERSION_MARKER_PATH = path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'thedotmack', 'plugin', '.install-version');
+const VERSION_MARKER_PATH = path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'seanGSISG', 'plugin', '.install-version');
 
 interface ContextConfig {
   // Display counts

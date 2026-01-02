@@ -200,7 +200,7 @@ async function waitForPortFree(port: number, timeoutMs: number = 10000): Promise
  * Get the plugin version from the installed marketplace package.json
  */
 function getInstalledPluginVersion(): string {
-  const marketplaceRoot = path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'thedotmack');
+  const marketplaceRoot = path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'seanGSISG');
   const packageJsonPath = path.join(marketplaceRoot, 'package.json');
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
   return packageJson.version;
@@ -1321,7 +1321,7 @@ async function detectClaudeCode(): Promise<boolean> {
 function findCursorHooksDir(): string | null {
   const possiblePaths = [
     // Marketplace install location
-    path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'thedotmack', 'cursor-hooks'),
+    path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'seanGSISG', 'cursor-hooks'),
     // Development/source location (relative to built worker-service.cjs in plugin/scripts/)
     path.join(path.dirname(__filename), '..', '..', 'cursor-hooks'),
     // Alternative dev location
@@ -1344,7 +1344,7 @@ function findCursorHooksDir(): string | null {
 function findMcpServerPath(): string | null {
   const possiblePaths = [
     // Marketplace install location
-    path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'thedotmack', 'plugin', 'scripts', 'mcp-server.cjs'),
+    path.join(homedir(), '.claude', 'plugins', 'marketplaces', 'seanGSISG', 'plugin', 'scripts', 'mcp-server.cjs'),
     // Development/source location (relative to built worker-service.cjs in plugin/scripts/)
     path.join(path.dirname(__filename), 'mcp-server.cjs'),
     // Alternative dev location
@@ -1379,7 +1379,7 @@ function configureCursorMcp(target: string): number {
 
   if (!mcpServerPath) {
     console.error('❌ Could not find MCP server script');
-    console.error('   Expected at: ~/.claude/plugins/marketplaces/thedotmack/plugin/scripts/mcp-server.cjs');
+    console.error('   Expected at: ~/.claude/plugins/marketplaces/seanGSISG/plugin/scripts/mcp-server.cjs');
     return 1;
   }
 
@@ -1446,7 +1446,7 @@ async function handleCursorCommand(subcommand: string, args: string[]): Promise<
       
       if (!cursorHooksDir) {
         console.error('❌ Could not find cursor-hooks directory');
-        console.error('   Expected at: ~/.claude/plugins/marketplaces/thedotmack/cursor-hooks/');
+        console.error('   Expected at: ~/.claude/plugins/marketplaces/seanGSISG/cursor-hooks/');
         return 1;
       }
       
