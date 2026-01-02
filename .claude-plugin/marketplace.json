@@ -1,11 +1,11 @@
 {
-  "name": "thedotmack",
+  "name": "seanGSISG",
   "owner": {
-    "name": "Alex Newman"
+    "name": "Sean (fork)"
   },
   "metadata": {
-    "description": "Plugins by Alex Newman (thedotmack)",
-    "homepage": "https://github.com/thedotmack/claude-mem"
+    "description": "Fork of claude-mem for testing",
+    "homepage": "https://github.com/seanGSISG/claude-mem"
   },
   "plugins": [
     {
