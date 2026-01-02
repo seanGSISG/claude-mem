@@ -10,32 +10,18 @@ import { execSync, spawnSync } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const ROOT = join(homedir(), '.claude', 'plugins', 'marketplaces', 'thedotmack');
+const ROOT = join(homedir(), '.claude', 'plugins', 'marketplaces', 'seanGSISG');
 const MARKER = join(ROOT, '.install-version');
 const IS_WINDOWS = process.platform === 'win32';
 
-/**
- * Check if Bun is installed and accessible
- */
-function isBunInstalled() {
-  try {
-    const result = spawnSync('bun', ['--version'], {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: IS_WINDOWS
-    });
-    if (result.status === 0) return true;
-  } catch {
-    // PATH check failed, try common installation paths
-  }
+// Common installation paths (handles fresh installs before PATH reload)
+const BUN_COMMON_PATHS = IS_WINDOWS
+  ? [join(homedir(), '.bun', 'bin', 'bun.exe')]
+  : [join(homedir(), '.bun', 'bin', 'bun'), '/usr/local/bin/bun'];
 
-  // Check common installation paths (handles fresh installs before PATH reload)
-  const bunPaths = IS_WINDOWS
-    ? [join(homedir(), '.bun', 'bin', 'bun.exe')]
-    : [join(homedir(), '.bun', 'bin', 'bun'), '/usr/local/bin/bun'];
-
-  return bunPaths.some(existsSync);
-}
+const UV_COMMON_PATHS = IS_WINDOWS
+  ? [join(homedir(), '.local', 'bin', 'uv.exe'), join(homedir(), '.cargo', 'bin', 'uv.exe')]
+  : [join(homedir(), '.local', 'bin', 'uv'), join(homedir(), '.cargo', 'bin', 'uv'), '/usr/local/bin/uv'];
 
 /**
  * Get the Bun executable path (from PATH or common install locations)
@@ -54,15 +40,14 @@ function getBunPath() {
   }
 
   // Check common installation paths
-  const bunPaths = IS_WINDOWS
-    ? [join(homedir(), '.bun', 'bin', 'bun.exe')]
-    : [join(homedir(), '.bun', 'bin', 'bun'), '/usr/local/bin/bun'];
+  return BUN_COMMON_PATHS.find(existsSync) || null;
+}
 
-  for (const bunPath of bunPaths) {
-    if (existsSync(bunPath)) return bunPath;
-  }
-
-  return null;
+/**
+ * Check if Bun is installed and accessible
+ */
+function isBunInstalled() {
+  return getBunPath() !== null;
 }
 
 /**
@@ -85,34 +70,41 @@ function getBunVersion() {
 }
 
 /**
- * Check if uv is installed and accessible
+ * Get the uv executable path (from PATH or common install locations)
  */
-function isUvInstalled() {
+function getUvPath() {
+  // Try PATH first
   try {
     const result = spawnSync('uv', ['--version'], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: IS_WINDOWS
     });
-    if (result.status === 0) return true;
+    if (result.status === 0) return 'uv';
   } catch {
-    // PATH check failed, try common installation paths
+    // Not in PATH
   }
 
-  // Check common installation paths (handles fresh installs before PATH reload)
-  const uvPaths = IS_WINDOWS
-    ? [join(homedir(), '.local', 'bin', 'uv.exe'), join(homedir(), '.cargo', 'bin', 'uv.exe')]
-    : [join(homedir(), '.local', 'bin', 'uv'), join(homedir(), '.cargo', 'bin', 'uv'), '/usr/local/bin/uv'];
+  // Check common installation paths
+  return UV_COMMON_PATHS.find(existsSync) || null;
+}
 
-  return uvPaths.some(existsSync);
+/**
+ * Check if uv is installed and accessible
+ */
+function isUvInstalled() {
+  return getUvPath() !== null;
 }
 
 /**
  * Get uv version if installed
  */
 function getUvVersion() {
+  const uvPath = getUvPath();
+  if (!uvPath) return null;
+
   try {
-    const result = spawnSync('uv', ['--version'], {
+    const result = spawnSync(uvPath, ['--version'], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: IS_WINDOWS
@@ -131,14 +123,12 @@ function installBun() {
 
   try {
     if (IS_WINDOWS) {
-      // Windows: Use PowerShell installer
       console.error('   Installing via PowerShell...');
       execSync('powershell -c "irm bun.sh/install.ps1 | iex"', {
         stdio: 'inherit',
         shell: true
       });
     } else {
-      // Unix/macOS: Use curl installer
       console.error('   Installing via curl...');
       execSync('curl -fsSL https://bun.sh/install | bash', {
         stdio: 'inherit',
@@ -146,35 +136,17 @@ function installBun() {
       });
     }
 
-    // Verify installation
-    if (isBunInstalled()) {
-      const version = getBunVersion();
-      console.error(`✅ Bun ${version} installed successfully`);
-      return true;
-    } else {
-      // Bun may be installed but not in PATH yet for this session
-      // Try common installation paths
-      const bunPaths = IS_WINDOWS
-        ? [join(homedir(), '.bun', 'bin', 'bun.exe')]
-        : [join(homedir(), '.bun', 'bin', 'bun'), '/usr/local/bin/bun'];
-
-      for (const bunPath of bunPaths) {
-        if (existsSync(bunPath)) {
-          console.error(`✅ Bun installed at ${bunPath}`);
-          console.error('⚠️  Please restart your terminal or add Bun to PATH:');
-          if (IS_WINDOWS) {
-            console.error(`   $env:Path += ";${join(homedir(), '.bun', 'bin')}"`);
-          } else {
-            console.error(`   export PATH="$HOME/.bun/bin:$PATH"`);
-          }
-          return true;
-        }
-      }
-
-      throw new Error('Bun installation completed but binary not found');
+    if (!isBunInstalled()) {
+      throw new Error(
+        'Bun installation completed but binary not found. ' +
+        'Please restart your terminal and try again.'
+      );
     }
+
+    const version = getBunVersion();
+    console.error(`✅ Bun ${version} installed successfully`);
   } catch (error) {
-    console.error('❌ Failed to install Bun automatically');
+    console.error('❌ Failed to install Bun');
     console.error('   Please install manually:');
     if (IS_WINDOWS) {
       console.error('   - winget install Oven-sh.Bun');
@@ -196,14 +168,12 @@ function installUv() {
 
   try {
     if (IS_WINDOWS) {
-      // Windows: Use PowerShell installer
       console.error('   Installing via PowerShell...');
       execSync('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"', {
         stdio: 'inherit',
         shell: true
       });
     } else {
-      // Unix/macOS: Use curl installer
       console.error('   Installing via curl...');
       execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', {
         stdio: 'inherit',
@@ -211,35 +181,17 @@ function installUv() {
       });
     }
 
-    // Verify installation
-    if (isUvInstalled()) {
-      const version = getUvVersion();
-      console.error(`✅ uv ${version} installed successfully`);
-      return true;
-    } else {
-      // uv may be installed but not in PATH yet for this session
-      // Try common installation paths
-      const uvPaths = IS_WINDOWS
-        ? [join(homedir(), '.local', 'bin', 'uv.exe'), join(homedir(), '.cargo', 'bin', 'uv.exe')]
-        : [join(homedir(), '.local', 'bin', 'uv'), join(homedir(), '.cargo', 'bin', 'uv'), '/usr/local/bin/uv'];
-
-      for (const uvPath of uvPaths) {
-        if (existsSync(uvPath)) {
-          console.error(`✅ uv installed at ${uvPath}`);
-          console.error('⚠️  Please restart your terminal or add uv to PATH:');
-          if (IS_WINDOWS) {
-            console.error(`   $env:Path += ";${join(homedir(), '.local', 'bin')}"`);
-          } else {
-            console.error(`   export PATH="$HOME/.local/bin:$PATH"`);
-          }
-          return true;
-        }
-      }
-
-      throw new Error('uv installation completed but binary not found');
+    if (!isUvInstalled()) {
+      throw new Error(
+        'uv installation completed but binary not found. ' +
+        'Please restart your terminal and try again.'
+      );
     }
+
+    const version = getUvVersion();
+    console.error(`✅ uv ${version} installed successfully`);
   } catch (error) {
-    console.error('❌ Failed to install uv automatically');
+    console.error('❌ Failed to install uv');
     console.error('   Please install manually:');
     if (IS_WINDOWS) {
       console.error('   - winget install astral-sh.uv');
@@ -250,61 +202,6 @@ function installUv() {
     }
     console.error('   Then restart your terminal and try again.');
     throw error;
-  }
-}
-
-/**
- * Add shell alias for claude-mem command
- */
-function installCLI() {
-  const WORKER_CLI = join(ROOT, 'plugin', 'scripts', 'worker-service.cjs');
-  const bunPath = getBunPath() || 'bun';
-  const aliasLine = `alias claude-mem='${bunPath} "${WORKER_CLI}"'`;
-  const markerPath = join(ROOT, '.cli-installed');
-
-  // Skip if already installed
-  if (existsSync(markerPath)) return;
-
-  try {
-    if (IS_WINDOWS) {
-      // Windows: Add to PATH via PowerShell profile
-      const profilePath = join(process.env.USERPROFILE || homedir(), 'Documents', 'PowerShell', 'Microsoft.PowerShell_profile.ps1');
-      const profileDir = join(process.env.USERPROFILE || homedir(), 'Documents', 'PowerShell');
-      const functionDef = `function claude-mem { & "${bunPath}" "${WORKER_CLI}" $args }\n`;
-
-      if (!existsSync(profileDir)) {
-        execSync(`mkdir "${profileDir}"`, { stdio: 'ignore', shell: true });
-      }
-
-      const existingContent = existsSync(profilePath) ? readFileSync(profilePath, 'utf-8') : '';
-      if (!existingContent.includes('function claude-mem')) {
-        writeFileSync(profilePath, existingContent + '\n' + functionDef);
-        console.error(`✅ PowerShell function added to profile`);
-        console.error('   Restart your terminal to use: claude-mem <command>');
-      }
-    } else {
-      // Unix: Add alias to shell configs
-      const shellConfigs = [
-        join(homedir(), '.bashrc'),
-        join(homedir(), '.zshrc')
-      ];
-
-      for (const config of shellConfigs) {
-        if (existsSync(config)) {
-          const content = readFileSync(config, 'utf-8');
-          if (!content.includes('alias claude-mem=')) {
-            writeFileSync(config, content + '\n' + aliasLine + '\n');
-            console.error(`✅ Alias added to ${config}`);
-          }
-        }
-      }
-      console.error('   Restart your terminal to use: claude-mem <command>');
-    }
-
-    writeFileSync(markerPath, new Date().toISOString());
-  } catch (error) {
-    console.error(`⚠️  Could not add shell alias: ${error.message}`);
-    console.error(`   Use directly: ${bunPath} "${WORKER_CLI}" <command>`);
   }
 }
 
@@ -323,11 +220,7 @@ function needsInstall() {
 }
 
 /**
- * Install dependencies using Bun with npm fallback
- *
- * Bun has issues with npm alias packages (e.g., string-width-cjs, strip-ansi-cjs)
- * that are defined in package-lock.json. When bun fails with 404 errors for these
- * packages, we fall back to npm which handles aliases correctly.
+ * Install dependencies using Bun
  */
 function installDeps() {
   const bunPath = getBunPath();
@@ -340,30 +233,7 @@ function installDeps() {
   // Quote path for Windows paths with spaces
   const bunCmd = IS_WINDOWS && bunPath.includes(' ') ? `"${bunPath}"` : bunPath;
 
-  let bunSucceeded = false;
-  try {
-    execSync(`${bunCmd} install`, { cwd: ROOT, stdio: 'inherit', shell: IS_WINDOWS });
-    bunSucceeded = true;
-  } catch {
-    // First attempt failed, try with force flag
-    try {
-      execSync(`${bunCmd} install --force`, { cwd: ROOT, stdio: 'inherit', shell: IS_WINDOWS });
-      bunSucceeded = true;
-    } catch {
-      // Bun failed completely, will try npm fallback
-    }
-  }
-
-  // Fallback to npm if bun failed (handles npm alias packages correctly)
-  if (!bunSucceeded) {
-    console.error('⚠️  Bun install failed, falling back to npm...');
-    console.error('   (This can happen with npm alias packages like *-cjs)');
-    try {
-      execSync('npm install', { cwd: ROOT, stdio: 'inherit', shell: IS_WINDOWS });
-    } catch (npmError) {
-      throw new Error('Both bun and npm install failed: ' + npmError.message);
-    }
-  }
+  execSync(`${bunCmd} install`, { cwd: ROOT, stdio: 'inherit', shell: IS_WINDOWS });
 
   // Write version marker
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
@@ -377,61 +247,12 @@ function installDeps() {
 
 // Main execution
 try {
-  // Step 1: Ensure Bun is installed (REQUIRED)
-  if (!isBunInstalled()) {
-    installBun();
-
-    // Re-check after installation
-    if (!isBunInstalled()) {
-      console.error('❌ Bun is required but not available in PATH');
-      console.error('   Please restart your terminal after installation');
-      process.exit(1);
-    }
-  }
-
-  // Step 2: Ensure uv is installed (REQUIRED for vector search)
-  if (!isUvInstalled()) {
-    installUv();
-
-    // Re-check after installation
-    if (!isUvInstalled()) {
-      console.error('❌ uv is required but not available in PATH');
-      console.error('   Please restart your terminal after installation');
-      process.exit(1);
-    }
-  }
-
-  // Step 3: Install dependencies if needed
+  if (!isBunInstalled()) installBun();
+  if (!isUvInstalled()) installUv();
   if (needsInstall()) {
-    const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
-    const newVersion = pkg.version;
-
     installDeps();
     console.error('✅ Dependencies installed');
-
-    // Auto-restart worker to pick up new code
-    const port = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
-    console.error(`[claude-mem] Plugin updated to v${newVersion} - restarting worker...`);
-    try {
-      // Graceful shutdown via HTTP (curl is cross-platform enough)
-      execSync(`curl -s -X POST http://127.0.0.1:${port}/api/admin/shutdown`, {
-        stdio: 'ignore',
-        shell: IS_WINDOWS,
-        timeout: 5000
-      });
-      // Brief wait for port to free
-      execSync(IS_WINDOWS ? 'timeout /t 1 /nobreak >nul' : 'sleep 0.5', {
-        stdio: 'ignore',
-        shell: true
-      });
-    } catch {
-      // Worker wasn't running or already stopped - that's fine
-    }
-    // Worker will be started fresh by next hook in chain (worker-service.cjs start)
   }
-
-  // Step 4: Install CLI to PATH
-  installCLI();
 } catch (e) {
   console.error('❌ Installation failed:', e.message);
   process.exit(1);
